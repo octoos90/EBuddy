@@ -7,16 +7,24 @@
 
 import FirebaseFirestore
 import FirebaseStorage
+import Combine
 
 class UserDetailViewModel: ObservableObject {
-    @Published var user: User? // Specific user for display
+    @Published var user: User? // User details
     @Published var isUploading: Bool = false
     @Published var uploadProgress: Double = 0.0
     @Published var errorMessage: String?
     @Published var successMessage: String?
 
     private let db = Firestore.firestore()
-    private let storage = Storage.storage()
+    private var cancellables = Set<AnyCancellable>()
+
+    init() {
+        // Observe the UploadManager for upload progress updates
+        UploadManager.shared.$uploadProgress
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$uploadProgress)
+    }
 
     // Fetch a single user by userId
     func fetchUser(userId: String) {
@@ -45,63 +53,38 @@ class UserDetailViewModel: ObservableObject {
         }
     }
 
-    // Upload profile image
-    func uploadProfileImage(userId: String, image: UIImage, completion: @escaping (Result<Void, Error>) -> Void) {
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
-            completion(.failure(NSError(domain: "InvalidImageData", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid image data."])))
-            return
-        }
-
+    // Upload profile image with progress updates
+    func uploadProfileImage(userId: String, imageData: Data, completion: @escaping (Result<Void, Error>) -> Void) {
         isUploading = true
-        let fileName = "profile.jpg"
-        let storageRef = storage.reference().child("profile_images/\(userId)/\(fileName)")
+        uploadProgress = 0.0
 
-        let uploadTask = storageRef.putData(imageData, metadata: nil) { [weak self] metadata, error in
+        // Use UploadManager to handle the upload process
+        UploadManager.shared.uploadImage(userId: userId, imageData: imageData) { [weak self] result in
             DispatchQueue.main.async {
                 self?.isUploading = false
             }
 
-            if let error = error {
+            switch result {
+            case .success(let imageURL):
+                self?.updateUserProfileImageURL(userId: userId, imageURL: imageURL, completion: completion)
+            case .failure(let error):
+                DispatchQueue.main.async {
+                    self?.errorMessage = "Failed to upload image: \(error.localizedDescription)"
+                }
                 completion(.failure(error))
-                return
             }
-
-            self?.getDownloadURL(storageRef: storageRef, userId: userId, completion: completion)
-        }
-
-        uploadTask.observe(.progress) { [weak self] snapshot in
-            DispatchQueue.main.async {
-                self?.uploadProgress = Double(snapshot.progress?.fractionCompleted ?? 0.0)
-            }
-        }
-    }
-
-    // Helper Function to Get Download URL
-    private func getDownloadURL(storageRef: StorageReference, userId: String, completion: @escaping (Result<Void, Error>) -> Void) {
-        storageRef.downloadURL { [weak self] url, error in
-            if let error = error {
-                completion(.failure(error))
-                return
-            }
-
-            guard let url = url else {
-                completion(.failure(NSError(domain: "InvalidURL", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to get download URL."])))
-                return
-            }
-
-            self?.updateUserProfileImageURL(userId: userId, imageURL: url.absoluteString, completion: completion)
         }
     }
 
     // Update Firestore with the new profile image URL
     private func updateUserProfileImageURL(userId: String, imageURL: String, completion: @escaping (Result<Void, Error>) -> Void) {
-        db.collection("USERS").document(userId).updateData(["profileImageURL": imageURL]) { error in
+        db.collection("USERS").document(userId).updateData(["profileImageURL": imageURL]) { [weak self] error in
             if let error = error {
                 completion(.failure(error))
             } else {
                 DispatchQueue.main.async {
-                    self.user?.profileImageURL = imageURL
-                    self.successMessage = "Profile image updated successfully!"
+                    self?.user?.profileImageURL = imageURL
+                    self?.successMessage = "Profile image updated successfully!"
                 }
                 completion(.success(()))
             }

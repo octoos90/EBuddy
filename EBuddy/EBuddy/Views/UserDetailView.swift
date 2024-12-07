@@ -58,6 +58,8 @@ struct UserDetailView: View {
                     if viewModel.isUploading {
                         ProgressView(value: viewModel.uploadProgress)
                             .padding()
+                            .progressViewStyle(LinearProgressViewStyle())
+                            .animation(.easeInOut, value: viewModel.uploadProgress)
                     }
                 }
             } else if viewModel.errorMessage != nil {
@@ -70,11 +72,11 @@ struct UserDetailView: View {
             viewModel.fetchUser(userId: userId)
         }
         .sheet(isPresented: $showImagePicker) {
-            ImagePicker(image: $selectedImage)
+            ImagePicker(image: $selectedImage) // Pass the selectedImage binding to the ImagePicker.
         }
         .onChange(of: selectedImage) { newImage in
-            if let newImage = newImage {
-                viewModel.uploadProfileImage(userId: userId, image: newImage) { result in
+            if let newImage = newImage, let imageData = newImage.jpegData(compressionQuality: 0.8) {
+                viewModel.uploadProfileImage(userId: userId, imageData: imageData) { result in
                     switch result {
                     case .success:
                         print("Image uploaded successfully!")
@@ -86,4 +88,3 @@ struct UserDetailView: View {
         }
     }
 }
-
