@@ -20,4 +20,5 @@ struct User: Codable, Identifiable {
     var phoneNumber: String?
     var gender: Gender?
     var ge: Int?
+    var profileImageURL: String?
 }

@@ -12,31 +12,67 @@ struct UserListView: View {
     @StateObject private var viewModel = UserViewModel()
 
     var body: some View {
-        NavigationView {
-            VStack {
-                if viewModel.isLoading {
-                    ProgressView("Loading...")
-                } else if let error = viewModel.errorMessage {
-                    Text(error)
-                        .foregroundColor(.red)
-                } else {
-                    List(viewModel.users) { user in
-                        VStack(alignment: .leading) {
-                            Text("UID: \(user.uid ?? "Unknown")")
-                            Text("Email: \(user.email ?? "Unknown")")
-                            Text("Phone: \(user.phoneNumber ?? "Unknown")")
+        VStack {
+            // Show loading indicator while data is being fetched
+            if viewModel.isLoading {
+                ProgressView("Loading users...")
+                    .padding()
+            }
+
+            // Show error message if there's an error
+            if let errorMessage = viewModel.errorMessage {
+                Text(errorMessage)
+                    .foregroundColor(.red)
+                    .padding()
+            }
+
+            // List of users
+            List(viewModel.users) { user in
+                NavigationLink(destination: UserDetailView(userId: user.uid ?? "")) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(user.email ?? "No Email")
+                                .font(.headline)
+                            Text(user.phoneNumber ?? "No Phone Number")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
                             Text("Gender: \(user.gender == .male ? "Male" : "Female")")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                        }
+                        Spacer()
+                        if let profileImageURL = user.profileImageURL, let url = URL(string: profileImageURL) {
+                            AsyncImage(url: url) { phase in
+                                if let image = phase.image {
+                                    image.resizable()
+                                        .frame(width: 50, height: 50)
+                                        .clipShape(Circle())
+                                } else if phase.error != nil {
+                                    Image(systemName: "person.circle.fill")
+                                        .resizable()
+                                        .frame(width: 50, height: 50)
+                                        .foregroundColor(.gray)
+                                } else {
+                                    ProgressView()
+                                }
+                            }
+                        } else {
+                            Image(systemName: "person.circle.fill")
+                                .resizable()
+                                .frame(width: 50, height: 50)
+                                .foregroundColor(.gray)
                         }
                     }
-                    .refreshable {
-                        viewModel.fetchUsers() // Refresh data on pull
-                    }
+                    .padding(.vertical, 5)
                 }
             }
-            .navigationTitle("Users")
-            .onAppear {
-                viewModel.fetchUsers()
+            .refreshable {
+                viewModel.fetchUsers() // Add pull-to-refresh functionality
             }
+        }
+        .navigationTitle("User List")
+        .onAppear {
+            viewModel.fetchUsers() // Fetch users when the view appears
         }
     }
 }
