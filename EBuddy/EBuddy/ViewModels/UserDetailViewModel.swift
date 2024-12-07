@@ -26,8 +26,8 @@ class UserDetailViewModel: ObservableObject {
             .assign(to: &$uploadProgress)
     }
 
-    // Fetch a single user by userId
-    func fetchUser(userId: String) {
+    // Fetch a single user by userId and update global state
+    func fetchUser(userId: String, userDataStore: UserDataStore) {
         db.collection("USERS").document(userId).getDocument { [weak self] snapshot, error in
             if let error = error {
                 DispatchQueue.main.async {
@@ -45,7 +45,10 @@ class UserDetailViewModel: ObservableObject {
 
             DispatchQueue.main.async {
                 do {
-                    self?.user = try Firestore.Decoder().decode(User.self, from: data)
+                    var user = try Firestore.Decoder().decode(User.self, from: data)
+                    user.id = userId // Assign document ID
+                    self?.user = user
+                    userDataStore.updateUser(user) // Update global UserDataStore
                 } catch {
                     self?.errorMessage = "Failed to decode user data: \(error.localizedDescription)"
                 }
@@ -53,8 +56,8 @@ class UserDetailViewModel: ObservableObject {
         }
     }
 
-    // Upload profile image with progress updates
-    func uploadProfileImage(userId: String, imageData: Data, completion: @escaping (Result<Void, Error>) -> Void) {
+    // Upload profile image and update global state
+    func uploadProfileImage(userId: String, imageData: Data, userDataStore: UserDataStore, completion: @escaping (Result<Void, Error>) -> Void) {
         isUploading = true
         uploadProgress = 0.0
 
@@ -66,7 +69,7 @@ class UserDetailViewModel: ObservableObject {
 
             switch result {
             case .success(let imageURL):
-                self?.updateUserProfileImageURL(userId: userId, imageURL: imageURL, completion: completion)
+                self?.updateUserProfileImageURL(userId: userId, imageURL: imageURL, userDataStore: userDataStore, completion: completion)
             case .failure(let error):
                 DispatchQueue.main.async {
                     self?.errorMessage = "Failed to upload image: \(error.localizedDescription)"
@@ -76,8 +79,8 @@ class UserDetailViewModel: ObservableObject {
         }
     }
 
-    // Update Firestore with the new profile image URL
-    private func updateUserProfileImageURL(userId: String, imageURL: String, completion: @escaping (Result<Void, Error>) -> Void) {
+    // Update Firestore with the new profile image URL and global state
+    private func updateUserProfileImageURL(userId: String, imageURL: String, userDataStore: UserDataStore, completion: @escaping (Result<Void, Error>) -> Void) {
         db.collection("USERS").document(userId).updateData(["profileImageURL": imageURL]) { [weak self] error in
             if let error = error {
                 completion(.failure(error))
@@ -85,6 +88,9 @@ class UserDetailViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     self?.user?.profileImageURL = imageURL
                     self?.successMessage = "Profile image updated successfully!"
+                    if let updatedUser = self?.user {
+                        userDataStore.updateUser(updatedUser) // Update global UserDataStore
+                    }
                 }
                 completion(.success(()))
             }

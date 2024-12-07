@@ -41,11 +41,6 @@ class AppState: ObservableObject {
 struct RootView: View {
     @StateObject private var appState = AppState() // Initialize AppState here
 
-    init() {
-        FirebaseApp.configure()
-        print("Firebase configured.")
-    }
-
     var body: some View {
         if appState.isLoading {
             ProgressView("Loading...")

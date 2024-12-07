@@ -10,7 +10,8 @@ import SwiftUI
 
 struct UserListView: View {
     @StateObject private var viewModel = UserViewModel()
-
+    @EnvironmentObject var userDataStore: UserDataStore // Access global UserDataStore
+    
     var body: some View {
         VStack {
             // Show loading indicator while data is being fetched
@@ -25,10 +26,14 @@ struct UserListView: View {
                     .foregroundColor(.red)
                     .padding()
             }
-
+            
             // List of users
             List(viewModel.users) { user in
-                NavigationLink(destination: UserDetailView(userId: user.uid ?? "")) {
+                NavigationLink(destination: UserDetailView(userId: user.uid ?? "")
+                    .onAppear {
+                        userDataStore.updateUser(user) // Update global UserJSON in UserDataStore
+                    }
+                ) {
                     HStack {
                         VStack(alignment: .leading, spacing: 5) {
                             Text(user.email ?? "No Email")
@@ -70,7 +75,6 @@ struct UserListView: View {
                 viewModel.fetchUsers() // Add pull-to-refresh functionality
             }
         }
-        .navigationTitle("User List")
         .onAppear {
             viewModel.fetchUsers() // Fetch users when the view appears
         }

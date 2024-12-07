@@ -9,7 +9,8 @@
 import SwiftUI
 
 struct UserDetailView: View {
-    @StateObject private var viewModel = UserDetailViewModel() // Use a separate ViewModel for details
+    @EnvironmentObject var userDataStore: UserDataStore // Access global state
+    @StateObject private var viewModel = UserDetailViewModel()
     @State private var showImagePicker = false
     @State private var selectedImage: UIImage?
 
@@ -17,7 +18,7 @@ struct UserDetailView: View {
 
     var body: some View {
         VStack {
-            if let user = viewModel.user {
+            if let user = userDataStore.userJSON {
                 VStack {
                     // Profile Image
                     if let profileImageURL = user.profileImageURL, let url = URL(string: profileImageURL) {
@@ -58,25 +59,21 @@ struct UserDetailView: View {
                     if viewModel.isUploading {
                         ProgressView(value: viewModel.uploadProgress)
                             .padding()
-                            .progressViewStyle(LinearProgressViewStyle())
-                            .animation(.easeInOut, value: viewModel.uploadProgress)
                     }
                 }
-            } else if viewModel.errorMessage != nil {
-                Text(viewModel.errorMessage ?? "Unknown error").foregroundColor(.red)
             } else {
-                ProgressView("Loading user details...")
+                Text("No user data available.").foregroundColor(.red)
             }
         }
         .onAppear {
-            viewModel.fetchUser(userId: userId)
+            viewModel.fetchUser(userId: userId, userDataStore: userDataStore)
         }
         .sheet(isPresented: $showImagePicker) {
-            ImagePicker(image: $selectedImage) // Pass the selectedImage binding to the ImagePicker.
+            ImagePicker(image: $selectedImage)
         }
         .onChange(of: selectedImage) { newImage in
             if let newImage = newImage, let imageData = newImage.jpegData(compressionQuality: 0.8) {
-                viewModel.uploadProfileImage(userId: userId, imageData: imageData) { result in
+                viewModel.uploadProfileImage(userId: userId, imageData: imageData, userDataStore: userDataStore) { result in
                     switch result {
                     case .success:
                         print("Image uploaded successfully!")

@@ -23,19 +23,32 @@ class UserViewModel: ObservableObject {
         db.collection("USERS").getDocuments { [weak self] snapshot, error in
             DispatchQueue.main.async {
                 self?.isLoading = false
+            }
 
-                if let error = error {
+            if let error = error {
+                DispatchQueue.main.async {
                     self?.errorMessage = "Failed to fetch users: \(error.localizedDescription)"
-                    return
                 }
+                return
+            }
 
-                guard let documents = snapshot?.documents else {
-                    self?.errorMessage = "No data found."
-                    return
+            guard let documents = snapshot?.documents else {
+                DispatchQueue.main.async {
+                    self?.errorMessage = "No users found."
                 }
+                return
+            }
 
-                self?.users = documents.compactMap { document in
-                    try? document.data(as: User.self)
+            DispatchQueue.main.async {
+                do {
+                    // Map Firestore documents to `User` struct
+                    self?.users = try documents.map { document in
+                        var user = try Firestore.Decoder().decode(User.self, from: document.data())
+                        user.id = document.documentID // Assign Firestore document ID
+                        return user
+                    }
+                } catch {
+                    self?.errorMessage = "Failed to decode users: \(error.localizedDescription)"
                 }
             }
         }
