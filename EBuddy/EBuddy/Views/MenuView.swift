@@ -24,6 +24,16 @@ struct MenuView: View {
                         .cornerRadius(8)
                         .padding(.horizontal)
                 }
+                
+                NavigationLink(destination: FigmaDesignView()) {
+                    Text("Figma Design")
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.pink)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                        .padding(.horizontal)
+                }
             }
             .navigationTitle("Menu")
         }
@@ -32,4 +42,3 @@ struct MenuView: View {
         }
     }
 }
-
